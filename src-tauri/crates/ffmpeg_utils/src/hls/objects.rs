@@ -401,7 +401,14 @@ unsafe extern "C" fn read_packet(opaque: *mut c_void, buf: *mut u8, size: c_int)
     .unwrap_or_else(|_| owner.fail("HLS object read callback panicked"))
 }
 
-unsafe extern "C" fn write_packet(opaque: *mut c_void, buf: *const u8, size: c_int) -> c_int {
+// FFmpeg 7 made the AVIO write callback's buffer const. Older SDKs (including
+// Ubuntu 24.04's FFmpeg 6) require a mutable pointer, but we never modify it.
+#[cfg(bsr_ffmpeg_7_0)]
+type WriteBuffer = *const u8;
+#[cfg(not(bsr_ffmpeg_7_0))]
+type WriteBuffer = *mut u8;
+
+unsafe extern "C" fn write_packet(opaque: *mut c_void, buf: WriteBuffer, size: c_int) -> c_int {
     let object = &mut *opaque.cast::<Object>();
     let owner = &*object.owner;
     catch_unwind(AssertUnwindSafe(|| {
