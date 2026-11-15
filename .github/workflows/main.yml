@@ -61,16 +61,15 @@ jobs:
         with:
           submodules: recursive
 
-      - name: install dependencies (ubuntu only)
+      - name: Setup FFmpeg 9.0.2 and dependencies (Linux only)
         if: runner.os == 'Linux'
-        uses: ./.github/actions/apt-install
+        uses: ./.github/actions/setup-ffmpeg
         with:
           packages: >-
             libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
-            libavformat-dev libavcodec-dev libavutil-dev libswresample-dev libavfilter-dev
             clang libclang-dev ninja-build python3 pkg-config
             libicu-dev libharfbuzz-dev libfreetype-dev libfontconfig1-dev
-            libpng-dev zlib1g-dev libexpat1-dev libjpeg-dev
+            libpng-dev zlib1g-dev libexpat1-dev libjpeg-dev rpm
 
       - name: Install FFmpeg development libraries (macOS only)
         if: runner.os == 'macOS'
@@ -244,6 +243,10 @@ jobs:
           # Merge once after all builds to avoid CPU/CUDA collisions and upload races.
           includeUpdaterJson: false
           args: ${{ matrix.args }} ${{ matrix.features == 'cuda' && '--config src-tauri/tauri.windows.cuda.conf.json' || '' }}
+
+      - name: Verify Linux packaged runtime without the build SDK
+        if: runner.os == 'Linux'
+        run: bash scripts/verify-linux-packages.sh
 
       - name: Verify macOS application signature
         if: runner.os == 'macOS'

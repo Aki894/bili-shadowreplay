@@ -1,13 +1,17 @@
 {
+  "build": {
+    "beforeBundleCommand": "node scripts/bundle-linux-ffmpeg.mjs"
+  },
   "bundle": {
+    "resources": {
+      "target/ffmpeg-runtime/": "ffmpeg-runtime/"
+    },
     "linux": {
       "deb": {
         "depends": [
-          "libavformat60",
-          "libavcodec60",
-          "libavutil58",
-          "libswresample4",
-          "libavfilter9",
+          "libc6 (>= 2.39)",
+          "libgcc-s1",
+          "libstdc++6",
           "libicu74",
           "libharfbuzz0b",
           "libharfbuzz-subset0",

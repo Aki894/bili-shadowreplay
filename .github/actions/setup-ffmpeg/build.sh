@@ -15,7 +15,7 @@ cd "$source_dir"
 
 # Keep optional libraries explicit so the SDK does not depend on which extra
 # development packages happen to be installed in the Tests or Lint runner.
-# This CPU test SDK includes all built-in codecs, filters and formats.
+# This CPU SDK is shared by tests and Linux releases.
 ./configure \
   --prefix="$prefix" \
   --cc=clang --cxx=clang++ \
@@ -27,3 +27,5 @@ cd "$source_dir"
   --enable-openssl --enable-zlib
 make -j"$(nproc)"
 make install
+mkdir -p "$prefix/share/ffmpeg-licenses"
+cp COPYING.* LICENSE.md "$prefix/share/ffmpeg-licenses/"

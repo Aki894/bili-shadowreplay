@@ -159,6 +159,8 @@ yarn tauri dev
 
 Ubuntu 24.04 的 `.deb` 在 Tauri 自动添加的桌面依赖之外，显式声明 Skia 所需的运行库：`libicu74`、`libharfbuzz0b`、`libharfbuzz-subset0`、`libfreetype6`、`libfontconfig1`、`libpng16-16t64`、`libjpeg-turbo8`、`libexpat1` 和 `zlib1g`。开发包（`*-dev`）、Clang、Ninja 和 Python 仅用于构建，不应作为最终用户的运行依赖。
 
+Linux 桌面发布与 Tests/Lint 共用校验过的 FFmpeg 9.0.2 SDK。deb、RPM 和 AppImage 携带应用私有的媒体运行库及非基础传递依赖，不使用 Ubuntu 24.04 的 FFmpeg 6，也不替换系统库。基础 glibc 和 C/C++ 运行库仍由系统提供；详见 [FFmpeg 配置](../getting-started/config/ffmpeg.md#linux--docker)。
+
 AppImage 也受到构建系统 ABI 和系统运行库的限制，不代表兼容 Ubuntu 22.04。其他发行版需自行确认相应的共享库名称、ABI 和版本；Ubuntu 包名不能直接用于 Debian。
 
 Docker 的构建阶段与运行阶段应保持在同一 **Debian trixie** 基线上，分别安装对应的开发包和运行库。不要只升级 builder 后继续使用旧版 Debian runtime，也不要把 Ubuntu 构建出的二进制直接复制到 Debian 镜像中。容器使用自身的用户态运行库，不要求宿主机安装上述 Ubuntu 桌面依赖；使用方式见 [Docker 部署](../getting-started/installation/docker.md)。

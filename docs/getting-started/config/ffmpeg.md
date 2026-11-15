@@ -28,7 +28,7 @@ FLV 直播录制直接复制音视频包到 event HLS，保留请求头、User-A
 
 弹幕表情图片也在进程内标准化：仅接受不超过 8 MiB 的本地 PNG/APNG、JPEG、GIF、WebP 普通文件，画布不超过 4,194,304 像素，单线程提取首帧并缩放为不大于 512×512 的 RGBA PNG。压缩 PNG 文本和 ICC 元数据的解压总量另限 8 MiB。失败、取消或十秒超时不会覆盖已有图片；原生调用协作取消，不能强制终止正在运行的解码器。输入限制不等于每任务的硬内存上限，也不会修改进程全局的 FFmpeg 分配限制。
 
-Windows 和 macOS 安装包携带原生媒体处理所需的动态库，不要求用户安装 CLI。Linux 使用目标发行版的匹配共享库，`.deb` 会声明对应依赖，Docker 镜像直接安装同一发行版的运行库。
+Windows、macOS 和 Linux 桌面安装包携带原生媒体处理所需的动态库，不要求用户安装 CLI。Linux 桌面包使用私有 FFmpeg 9.0.2 运行库，不替换系统 FFmpeg；`.deb` 仍声明基础系统和桌面依赖。Docker 镜像直接安装同一发行版的运行库。
 
 启动日志中的版本和可编译编码器列表直接读取所链接的 FFmpeg SDK，与 `PATH` 上的可执行文件无关。硬件可用性通过实际打开编码器、编码三帧并排空来探测，保留原候选顺序、缓存和软件回退策略；VAAPI 直接建立硬件设备和帧池。已注册的编码器仍可能因为设备或驱动不可用而探测失败。
 
@@ -38,7 +38,7 @@ Windows 和 macOS 安装包携带原生媒体处理所需的动态库，不要�
 
 ## Linux
 
-桌面 `.deb` 最低基线为 Ubuntu 24.04。推荐使用 `sudo apt install ./下载的文件名.deb`，由包管理器安装匹配的共享库。Docker 镜像已经包含这些运行库；其他发行版或自定义 AppImage 必须提供匹配 ABI 和所需编解码器，不能照搬 Ubuntu 的库包名。
+桌面 `.deb` 最低基线为 Ubuntu 24.04。推荐使用 `sudo apt install ./下载的文件名.deb`，由包管理器安装基础系统和桌面依赖。FFmpeg 9.0.2 及其非基础传递依赖放在应用私有的 `ffmpeg-runtime` 目录，通过相对运行库路径加载，不要求系统提供 FFmpeg 9。AppImage 和 RPM 同样携带该运行库，但仍需要兼容的 glibc、C/C++ 和桌面运行环境，不因此支持旧系统。Docker 的运行库策略不变。
 
 ### Docker VAAPI 硬件编码
 
@@ -97,9 +97,11 @@ Ubuntu 24.04 / Debian 的开发依赖：
 sudo apt install clang libclang-dev pkg-config libavformat-dev libavcodec-dev libavutil-dev libswresample-dev libavfilter-dev
 ```
 
-Linux 的 Tests 和 Lint CI 通过共享的 `setup-ffmpeg` action 构建并缓存固定版本 FFmpeg 9.0.2，校验源包 SHA-256，并统一配置头文件、共享库和 CLI 的搜索路径。首次缓存未命中时需要编译 SDK；后续复用缓存。CLI 对照测试保留逐包比较，避免 Ubuntu 24.04 自带的 FFmpeg 6.1 与开发 SDK 版本不同。
+Linux 的 Tests、Lint 和 Release 通过共享的 `setup-ffmpeg` action 构建并缓存固定版本 FFmpeg 9.0.2，校验源包 SHA-256，并统一配置头文件、共享库和 CLI 的搜索路径。首次缓存未命中时需要编译 SDK；后续复用缓存。CLI 对照测试保留逐包比较，避免 Ubuntu 24.04 自带的 FFmpeg 6.1 与开发 SDK 版本不同。对象存储录制和续写依赖新版 HLS 自定义 I/O 行为；不能仅因旧版 SDK 编译通过就用它替换发布 SDK。
 
-Docker builder 安装发行版的开发包。Docker runtime 保持与 builder 相同的 Debian trixie 基线，安装 `libavformat61`、`libavcodec61`、`libavutil59`、`libswresample5`、`libavfilter10` 和 `libswscale8`，不安装 CLI 可执行文件；镜像构建会用 `ldd` 检查所有动态依赖。Ubuntu 24.04 桌面 `.deb` 显式依赖 `libavformat60`、`libavcodec60`、`libavutil58`、`libswresample4` 和 `libavfilter9`；其他发行版需使用自身匹配的包，不能直接照搬这些 ABI 名称。
+Linux 的 `beforeBundleCommand` 运行 `scripts/bundle-linux-ffmpeg.mjs`，收集 SDK 的媒体库和非基础传递依赖，复制到 `src-tauri/target/ffmpeg-runtime` 并设置相对运行库路径；系统 loader、glibc 和 C/C++ 运行库不打包。CI 从安装目录布局运行真实 HLS 测试，清除 `LD_LIBRARY_PATH`，验证录制、续写及失败恢复。发布任务解包检查 deb、RPM 和 AppImage，并在干净的 Ubuntu 24.04 容器中安装 deb、检查动态依赖，避免构建机 SDK 掩盖缺失运行库。
+
+Docker builder 安装发行版的开发包。Docker runtime 保持与 builder 相同的 Debian trixie 基线，安装 `libavformat61`、`libavcodec61`、`libavutil59`、`libswresample5`、`libavfilter10` 和 `libswscale8`，不安装 CLI 可执行文件；镜像构建会用 `ldd` 检查所有动态依赖。桌面 `.deb` 不再依赖 Ubuntu 的 FFmpeg 6 ABI 包；其他发行版仍需使用自身匹配的基础和桌面依赖，不能直接照搬 Ubuntu 包名。
 
 ### Windows
 
