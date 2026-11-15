@@ -5,7 +5,9 @@ on:
     branches: [fix/appimage-runtime]
 
 permissions:
-  contents: read
+  # GitHub requires push access to read draft release assets. This workflow
+  # only downloads them; it never edits or publishes a release.
+  contents: write
 
 jobs:
   inspect:
