@@ -25,7 +25,11 @@ verify "$root/rpm"
 echo "Verify AppImage runtime"
 image="${images[0]}"
 (cd "$root" && "$image" --appimage-extract > /dev/null)
-verify "$root/squashfs-root"
+node scripts/bundle-linux-ffmpeg.mjs --verify --appimage \
+  --binary "$root/squashfs-root/usr/bin/bili-shadowreplay" \
+  --runtime "$root/squashfs-root/usr/lib/bili-shadowreplay/ffmpeg-runtime" \
+  --package-root "$root/squashfs-root"
+bash scripts/verify-appimage-launch.sh "$root/squashfs-root"
 
 # Install the actual deb in a clean supported distro, not the SDK-bearing runner.
 echo "Verify deb installation on clean Ubuntu 24.04"

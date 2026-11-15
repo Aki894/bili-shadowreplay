@@ -28,6 +28,38 @@ function dependencies(binary, env) {
   return parseDependencies(run("ldd", [binary], env));
 }
 
+export function appImageEnvironment(packageRoot) {
+  // AppRun searches AppDir/usr/lib. Reproduce only that package-owned path,
+  // never the invoking shell's SDK path or AppRun's trailing empty/CWD entry.
+  return { ...cleanEnv, LD_LIBRARY_PATH: path.join(path.resolve(packageRoot), "usr/lib") };
+}
+
+export function verifyAppImageLaunch(log, directory, packageRoot) {
+  const bundled = new Set(fs.readdirSync(directory).filter((name) => name.includes(".so")));
+  const lines = log.split("\n");
+  const pids = new Set(lines.flatMap((line) => {
+    const match = line.match(/^\s*(\d+):\s+initialize program: (?:.*\/)?bili-shadowreplay\s*$/);
+    return match ? [match[1]] : [];
+  }));
+  if (pids.size !== 1) throw new Error("Expected one application process in the AppRun loader trace");
+  const loaded = new Set();
+  const root = fs.realpathSync(packageRoot) + path.sep;
+  for (const line of lines) {
+    const match = line.match(/^\s*(\d+):\s+calling init: (\/.+?)\s*$/);
+    if (!match || !pids.has(match[1])) continue;
+    const name = path.basename(match[2]);
+    if (!bundled.has(name)) continue;
+    if (!fs.realpathSync(match[2]).startsWith(root)) {
+      throw new Error(`AppRun loaded a system copy of ${name}: ${match[2]}`);
+    }
+    loaded.add(name);
+  }
+  for (const name of ["libavformat.so.63", "libfontconfig.so.1", "libfribidi.so.0"]) {
+    if (!loaded.has(name)) throw new Error(`AppRun did not initialize ${name}`);
+  }
+  console.log(`Verified ${loaded.size} package-owned libraries in the actual AppRun process`);
+}
+
 function copyLicenses(libraries, sdk, directory) {
   const destination = path.join(directory, "licenses");
   fs.cpSync(path.join(sdk, "../share/ffmpeg-licenses"), path.join(destination, "ffmpeg"), { recursive: true });
@@ -53,7 +85,7 @@ function copyLicenses(libraries, sdk, directory) {
   }
 }
 
-export function verify(binary, directory, packageRoot = directory) {
+export function verify(binary, directory, packageRoot = directory, appImage = false) {
   const files = fs.readdirSync(directory).filter((name) => name.includes(".so"));
   if (!files.some((name) => /^libavformat\.so\.63$/.test(name))) {
     throw new Error("FFmpeg 9 runtime (libavformat.so.63) is missing");
@@ -61,7 +93,7 @@ export function verify(binary, directory, packageRoot = directory) {
   const bundled = new Set(files);
   for (const file of [binary, ...files.map((name) => path.join(directory, name))]) {
     const isLibrary = file !== binary;
-    const linked = dependencies(file);
+    const linked = dependencies(file, appImage ? appImageEnvironment(packageRoot) : cleanEnv);
     if (!isLibrary && !linked.has("libavformat.so.63")) throw new Error("Packaged application does not load FFmpeg 9");
     for (const [name, location] of linked) {
       if (bundled.has(name)) {
@@ -75,7 +107,7 @@ export function verify(binary, directory, packageRoot = directory) {
       }
     }
   }
-  console.log(`Verified ${files.length} Linux runtime libraries without LD_LIBRARY_PATH`);
+  console.log(`Verified ${files.length} Linux runtime libraries ${appImage ? "with AppRun's package-only library path" : "without LD_LIBRARY_PATH"}`);
 }
 
 export function bundle(binary, directory, sdk) {
@@ -148,7 +180,11 @@ function main() {
   if (!explicit && existing.length !== 1) throw new Error("Set RUST_TARGET to select exactly one application executable");
   const binary = explicit || existing[0];
   const directory = flag("--runtime") || path.join(nativeRoot, "target/ffmpeg-runtime");
-  if (args.includes("--verify")) verify(binary, directory, flag("--package-root"));
+  const packageRoot = flag("--package-root");
+  const launchLog = flag("--verify-launch");
+  if ((args.includes("--appimage") || launchLog) && !packageRoot) throw new Error("AppImage verification requires --package-root");
+  if (launchLog) verifyAppImageLaunch(fs.readFileSync(launchLog, "utf8"), directory, packageRoot);
+  else if (args.includes("--verify")) verify(binary, directory, packageRoot, args.includes("--appimage"));
   else bundle(binary, directory, run("pkg-config", ["--variable=libdir", "libavformat"]));
 }
 

@@ -67,6 +67,16 @@ jobs:
           set -e
           echo "AppRun exit: $status (124 means it stayed running until the timeout)"
           grep -E 'calling init:.*(libfontconfig|libfribidi|libavformat|libavcodec)|error while loading|symbol lookup error|panicked|Gtk-WARNING' "$directory/launch.log" || true
+      - name: Validate the proposed AppImage file mapping on the same binaries
+        run: |
+          root="$RUNNER_TEMP/appimage-check/squashfs-root"
+          # Reproduce bundle.linux.appimage.files without rebuilding any code.
+          cp -a "$root/usr/lib/bili-shadowreplay/ffmpeg-runtime/." "$root/usr/lib/"
+          node scripts/bundle-linux-ffmpeg.mjs --verify --appimage \
+            --binary "$root/usr/bin/bili-shadowreplay" \
+            --runtime "$root/usr/lib/bili-shadowreplay/ffmpeg-runtime" \
+            --package-root "$root"
+          bash scripts/verify-appimage-launch.sh "$root"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
