@@ -15,16 +15,20 @@ debs=("$bundle"/deb/*.deb)
 rpms=("$bundle"/rpm/*.rpm)
 images=("$bundle"/appimage/*.AppImage)
 [[ ${#debs[@]} == 1 && ${#rpms[@]} == 1 && ${#images[@]} == 1 ]]
+echo "Verify deb runtime"
 dpkg-deb -x "${debs[0]}" "$root/deb"
 verify "$root/deb"
+echo "Verify RPM runtime"
 mkdir "$root/rpm"
-rpm2cpio "${rpms[0]}" | (cd "$root/rpm" && cpio -idm --quiet)
+bsdtar -xf "${rpms[0]}" -C "$root/rpm"
 verify "$root/rpm"
+echo "Verify AppImage runtime"
 image="${images[0]}"
 (cd "$root" && "$image" --appimage-extract > /dev/null)
 verify "$root/squashfs-root"
 
 # Install the actual deb in a clean supported distro, not the SDK-bearing runner.
+echo "Verify deb installation on clean Ubuntu 24.04"
 docker run --rm -v "${debs[0]}:/tmp/bsr.deb:ro" ubuntu:24.04 bash -euc '
   apt-get update -qq
   DEBIAN_FRONTEND=noninteractive apt-get install -y /tmp/bsr.deb

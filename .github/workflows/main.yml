@@ -69,7 +69,7 @@ jobs:
             libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
             clang libclang-dev ninja-build python3 pkg-config
             libicu-dev libharfbuzz-dev libfreetype-dev libfontconfig1-dev
-            libpng-dev zlib1g-dev libexpat1-dev libjpeg-dev rpm
+            libpng-dev zlib1g-dev libexpat1-dev libjpeg-dev libarchive-tools
 
       - name: Install FFmpeg development libraries (macOS only)
         if: runner.os == 'macOS'
