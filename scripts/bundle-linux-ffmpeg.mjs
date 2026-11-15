@@ -68,7 +68,7 @@ export function verify(binary, directory, packageRoot = directory) {
         // linuxdeploy may relocate AppImage libraries into AppDir/usr/lib.
         // They must still resolve inside the extracted package, never the SDK.
         if (!fs.realpathSync(location).startsWith(fs.realpathSync(packageRoot) + path.sep)) {
-          throw new Error(`Library escaped private runtime: ${name} => ${location}`);
+          throw new Error(`Library escaped private runtime in ${file}: ${name} => ${location}`);
         }
       } else if (mediaLibrary.test(name) || (isLibrary && !systemLibrary(name))) {
         throw new Error(`Unbundled media dependency: ${name}`);
