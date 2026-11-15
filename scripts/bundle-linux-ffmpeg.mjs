@@ -118,7 +118,9 @@ export function bundle(binary, directory, sdk) {
     // Only the generated runtime directory is replaced, never system libraries.
     fs.rmSync(directory, { recursive: true, force: true });
     fs.renameSync(temporary, directory);
-    run("patchelf", ["--set-rpath", `$ORIGIN/${runtimePath}`, binary]);
+    // RPATH is inherited for indirect dependencies; RUNPATH is not. GTK can
+    // otherwise load a system copy of a shared media dependency before FFmpeg.
+    run("patchelf", ["--force-rpath", "--set-rpath", `$ORIGIN/${runtimePath}`, binary]);
   } finally {
     fs.rmSync(temporary, { recursive: true, force: true });
   }

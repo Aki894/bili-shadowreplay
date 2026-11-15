@@ -21,3 +21,20 @@ runtime="$root/usr/lib/bili-shadowreplay/ffmpeg-runtime"
 node scripts/bundle-linux-ffmpeg.mjs --binary "$root/usr/bin/hls-tests" --runtime "$runtime"
 node scripts/bundle-linux-ffmpeg.mjs --verify --binary "$root/usr/bin/hls-tests" --runtime "$runtime"
 env -u LD_LIBRARY_PATH -u LD_PRELOAD "$root/usr/bin/hls-tests" hls::
+
+# Model GTK loading a shared dependency before FFmpeg. With only RUNPATH,
+# this indirect edge selects the system FriBidi even though we bundled it.
+cat > "$root/parent.c" <<'C'
+extern const char *fribidi_version_info;
+const char *parent_version(void) { return fribidi_version_info; }
+C
+cat > "$root/probe.c" <<'C'
+#include <libavformat/avformat.h>
+extern const char *parent_version(void);
+int main(void) { return !parent_version() || !avformat_version(); }
+C
+cc -shared -fPIC "$root/parent.c" -lfribidi -o "$root/libparent.so"
+cc "$root/probe.c" "$root/libparent.so" $(pkg-config --cflags --libs libavformat) -o "$root/usr/bin/probe"
+node scripts/bundle-linux-ffmpeg.mjs --binary "$root/usr/bin/probe" --runtime "$runtime"
+node scripts/bundle-linux-ffmpeg.mjs --verify --binary "$root/usr/bin/probe" --runtime "$runtime"
+env -u LD_LIBRARY_PATH -u LD_PRELOAD "$root/usr/bin/probe"

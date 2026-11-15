@@ -133,8 +133,15 @@ jobs:
             rm -rf src-tauri/target/sherpa-onnx-prebuilt
             target_args=()
             if [ -n "$RUST_TARGET" ]; then target_args+=(--target "$RUST_TARGET"); fi
-            cargo clean -p sherpa-onnx-sys --manifest-path src-tauri/Cargo.toml "${target_args[@]}"
+            cargo clean -p sherpa-onnx-sys --release --manifest-path src-tauri/Cargo.toml "${target_args[@]}"
           fi
+
+      - name: Reset pruned macOS runtime staging after cache restore
+        if: runner.os == 'macOS'
+        run: |
+          # rust-cache strips non-Cargo files such as runtime.json but retains
+          # their directories. Recreate and verify the pinned runtime normally.
+          rm -rf src-tauri/target/macos-runtime
 
       - name: Install CUDA toolkit (Windows CUDA only)
         if: matrix.features == 'cuda'
