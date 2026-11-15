@@ -46,7 +46,8 @@ jobs:
           workspaces: src-tauri -> target
           key: system-ffmpeg-hls
           save-if: ${{ github.ref == 'refs/heads/main' }}
-      - run: cargo test --manifest-path src-tauri/Cargo.toml -p ffmpeg_utils --lib hls:: --locked
+      - run: |
+          cargo test --manifest-path src-tauri/Cargo.toml -p ffmpeg_utils --lib hls:: --locked
 
   catalog:
     name: Recording catalog tests
